@@ -1,0 +1,70 @@
+name: pgp-manager
+title: PGP Manager
+
+# Version is injected by CI (sed replacement before snapcraft runs).
+version: '0.0.0'
+
+summary: Modern OpenPGP key management and encryption
+description: |
+  PGP encryption and key management — without the terminal.
+  
+  PGP Manager is a modern OpenPGP desktop app for Linux. Generate keys,
+  encrypt files, sign messages and verify signatures through a clean UI,
+  while your clipboard is monitored automatically in the background.
+  
+  Features:
+    - Encrypt, decrypt, sign and verify text and files
+    - Clipboard monitoring with one-click actions from the system tray
+    - Generate, import and export OpenPGP keys (RSA and Ed25519)
+    - GnuPG keyring integration — existing gpg keys appear automatically
+    - Search and publish keys on public keyservers
+    - Passphrase cache with configurable TTL
+    - Portable mode: keep config and keys on a USB drive
+
+website: https://github.com/developaaah/pgp-manager
+issues: https://github.com/developaaah/pgp-manager/issues
+source-code: https://github.com/developaaah/pgp-manager
+license: MIT
+
+grade: stable
+confinement: strict
+base: core24
+
+apps:
+  pgp-manager:
+    command: bin/pgpmanager
+    extensions: [gnome]
+    desktop: usr/share/applications/com.developaaah.pgp-manager.desktop
+    plugs:
+      - home        # read/write ~/.pgp key storage
+      - network     # keyserver search and publish
+
+parts:
+  pgp-manager:
+    plugin: nil
+    source: .
+    override-build: |
+      install -Dm755 bin/pgpmanager "$SNAPCRAFT_PART_INSTALL/bin/pgpmanager"
+
+  desktop-files:
+    plugin: dump
+    source: build/linux/
+    organize:
+      pgp-manager.desktop: usr/share/applications/com.developaaah.pgp-manager.desktop
+      com.developaaah.pgp-manager.metainfo.xml: usr/share/metainfo/com.developaaah.pgp-manager.metainfo.xml
+    stage:
+      - usr/share/applications/com.developaaah.pgp-manager.desktop
+      - usr/share/metainfo/com.developaaah.pgp-manager.metainfo.xml
+
+  icons:
+    plugin: nil
+    source: build/
+    build-packages:
+      - imagemagick
+    override-build: |
+      for SIZE in 16 32 48 64 128 256 512; do
+        DIR="$SNAPCRAFT_PART_INSTALL/usr/share/icons/hicolor/${SIZE}x${SIZE}/apps"
+        mkdir -p "$DIR"
+        convert "$SNAPCRAFT_PART_SRC/appicon.png" -resize "${SIZE}x${SIZE}" \
+          "$DIR/com.developaaah.pgp-manager.png"
+      done

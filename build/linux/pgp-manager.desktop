@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=PGP Manager
+GenericName=OpenPGP Manager
+Comment=Modern OpenPGP key management and encryption
+Exec=pgpmanager %u
+Icon=com.developaaah.pgp-manager
+Terminal=false
+Categories=Utility;Security;
+MimeType=x-scheme-handler/pgp-manager;
+Keywords=pgp;gpg;openpgp;encryption;security;privacy;cryptography;keyserver;
+StartupWMClass=pgpmanager
+StartupNotify=true

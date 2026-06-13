@@ -1,0 +1,234 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  GO_VERSION: "1.26"
+  NODE_VERSION: "20"
+
+jobs:
+  # macOS: arm64 + amd64 DMGs
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build DMGs (Apple Silicon + Intel)
+        run: make dmg-arm64 dmg-amd64 VERSION=${{ github.ref_name }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: bin/PGP-Manager_mac_*.dmg
+          if-no-files-found: error
+
+  # Linux: amd64 + 386 (Docker, native on the amd64 runner)
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build linux_amd + linux_32bit
+        run: make linux-amd64 linux-386 VERSION=${{ github.ref_name }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86
+          path: |
+            bin/PGP-Manager_linux_amd_*
+            bin/PGP-Manager_linux_32bit_*
+          if-no-files-found: error
+
+  # Linux: arm64 (native ARM runner)
+  linux-arm:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build linux_arm
+        run: make linux-arm64 VERSION=${{ github.ref_name }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm
+          path: bin/PGP-Manager_linux_arm_*
+          if-no-files-found: error
+
+  # Windows: 64bit + 32bit
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build windows_64bit + windows_32bit
+        shell: bash
+        run: make windows-amd64 windows-386 VERSION=${{ github.ref_name }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: bin/PGP-Manager_windows_*.exe
+          if-no-files-found: error
+
+  # Linux packages (.deb + .rpm)
+  packages:
+    needs: [linux, linux-arm]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: linux-*
+          path: bin
+          merge-multiple: true
+
+      - name: Install packaging tools
+        run: |
+          sudo apt-get install -y --no-install-recommends imagemagick rpm
+          sudo gem install fpm --no-document
+
+      - name: Build .deb and .rpm packages
+        run: |
+          VERSION=${{ github.ref_name }}
+          build/linux/package.sh "bin/PGP-Manager_linux_amd_${VERSION}"   amd64 "${VERSION}" bin
+          build/linux/package.sh "bin/PGP-Manager_linux_arm_${VERSION}"   arm64 "${VERSION}" bin
+          build/linux/package.sh "bin/PGP-Manager_linux_32bit_${VERSION}" 386   "${VERSION}" bin
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-packages
+          path: |
+            bin/*.deb
+            bin/*.rpm
+          if-no-files-found: error
+
+  # ── Snap: amd64 ─────────────────────────────────────────────────────────────
+  snap-amd64:
+    needs: [linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-x86
+          path: bin
+
+      - name: Prepare binary and inject version
+        run: |
+          VERSION=${{ github.ref_name }}
+          cp "bin/PGP-Manager_linux_amd_${VERSION}" bin/pgpmanager
+          chmod +x bin/pgpmanager
+          sed -i "s/^version: .*/version: '${VERSION#v}'/" snap/snapcraft.yaml
+
+      - uses: snapcore/action-build@v1
+        id: build
+
+      - name: Publish to Snap Store
+        if: env.SNAPCRAFT_STORE_CREDENTIALS != ''
+        uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAP_STORE_TOKEN }}
+        with:
+          snap: ${{ steps.build.outputs.snap }}
+          release: stable
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: snap-amd64
+          path: ${{ steps.build.outputs.snap }}
+          if-no-files-found: error
+
+  # ── Snap: arm64 ─────────────────────────────────────────────────────────────
+  snap-arm64:
+    needs: [linux-arm]
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-arm
+          path: bin
+
+      - name: Prepare binary and inject version
+        run: |
+          VERSION=${{ github.ref_name }}
+          cp "bin/PGP-Manager_linux_arm_${VERSION}" bin/pgpmanager
+          chmod +x bin/pgpmanager
+          sed -i "s/^version: .*/version: '${VERSION#v}'/" snap/snapcraft.yaml
+
+      - uses: snapcore/action-build@v1
+        id: build
+
+      - name: Publish to Snap Store
+        if: env.SNAPCRAFT_STORE_CREDENTIALS != ''
+        uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAP_STORE_TOKEN }}
+        with:
+          snap: ${{ steps.build.outputs.snap }}
+          release: stable
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: snap-arm64
+          path: ${{ steps.build.outputs.snap }}
+          if-no-files-found: error
+
+  # ── GitHub Release with all artifacts ───────────────────────────────────────
+  release:
+    needs: [macos, linux, linux-arm, windows, packages, snap-amd64, snap-arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate SHA256SUMS
+        run: |
+          cd dist
+          sha256sum * > SHA256SUMS
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.drag-region {
+  -webkit-app-region: drag;
+  --wails-draggable: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+  --wails-draggable: no-drag;
+}
+
+
+:root {
+  /* Window & surface backgrounds */
+  --c-window:     247 247 249;    /* #f7f7f9 — main content bg    */
+  --c-sidebar:    240 240 242;    /* #f0f0f2 — sidebar            */
+  --c-titlebar:   232 232 234;    /* #e8e8ea — titlebar           */
+  --c-elevated:   255 255 255;    /* cards, modals                */
+
+  /* Borders */
+  --c-border:     0 0 0 / 0.07;
+  --c-border-strong: 0 0 0 / 0.12;
+
+  /* Text */
+  --c-text:       0 0 0 / 0.85;
+  --c-text-2:     0 0 0 / 0.50;
+  --c-text-3:     0 0 0 / 0.30;
+  --c-text-4:     0 0 0 / 0.22;
+
+  /* Fields (inputs, textareas) */
+  --c-field:      255 255 255;
+  --c-field-border: 0 0 0 / 0.09;
+  --c-field-border-focus: 0 102 204 / 0.45;
+
+  /* Fill layers */
+  --c-fill:       0 0 0 / 0.04;
+  --c-fill-2:     0 0 0 / 0.07;
+
+  /* Accent (macOS blue) */
+  --c-accent:     0 102 204;       /* #0066CC */
+  --c-accent-2:   0 85 204;        /* #0055CC — sidebar active text */
+  --c-accent-bg:  0 100 220 / 0.10;
+
+  /* Sidebar items */
+  --c-nav-text:         0 0 0 / 0.42;
+  --c-nav-label:        0 0 0 / 0.25;
+  --c-nav-active-bg:    0 100 220 / 0.10;
+  --c-nav-active-text:  0 85 204;
+  --c-nav-hover-bg:     0 0 0 / 0.05;
+  --c-nav-hover-text:   0 0 0 / 0.70;
+
+  /* Status */
+  --c-success: 52 199 89;
+  --c-warning: 255 204 0;
+  --c-error:   255 56 60;
+}
+
+.dark {
+  --c-window:     28 28 30;       /* #1C1C1E — gray-6-dark        */
+  --c-sidebar:    37 37 40;       /* #252528                      */
+  --c-titlebar:   44 44 46;       /* #2C2C2E — gray-5-dark        */
+  --c-elevated:   44 44 46;       /* modals, cards                */
+
+  /* Borders */
+  --c-border:     255 255 255 / 0.05;
+  --c-border-strong: 255 255 255 / 0.10;
+
+  /* Text */
+  --c-text:       255 255 255 / 0.90;
+  --c-text-2:     255 255 255 / 0.50;
+  --c-text-3:     255 255 255 / 0.28;
+  --c-text-4:     255 255 255 / 0.22;
+
+  /* Fields */
+  --c-field:      255 255 255 / 0.04;
+  --c-field-border: 255 255 255 / 0.08;
+  --c-field-border-focus: 10 132 255 / 0.50;
+
+  /* Fill layers */
+  --c-fill:       255 255 255 / 0.04;
+  --c-fill-2:     255 255 255 / 0.08;
+
+  /* Accent (macOS dark mode blue) */
+  --c-accent:     10 132 255;      /* #0A84FF */
+  --c-accent-2:   90 173 255;      /* #5AADFF — sidebar active text */
+  --c-accent-bg:  10 132 255 / 0.22;
+
+  /* Sidebar items */
+  --c-nav-text:         255 255 255 / 0.48;
+  --c-nav-label:        255 255 255 / 0.22;
+  --c-nav-active-bg:    10 132 255 / 0.22;
+  --c-nav-active-text:  90 173 255;
+  --c-nav-hover-bg:     255 255 255 / 0.05;
+  --c-nav-hover-text:   255 255 255 / 0.70;
+
+  /* Status */
+  --c-success: 48 209 88;
+  --c-warning: 255 214 0;
+  --c-error:   255 66 69;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  overflow: hidden;
+  user-select: none;
+}
+
+textarea, input {
+  user-select: text;
+}
+
+dialog {
+  background: transparent;
+  border: none;
+  padding: 0;
+  outline: none;
+  max-width: 100vw;
+  max-height: 100vh;
+  overflow: visible;
+}
+
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.50);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}

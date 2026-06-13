@@ -1,0 +1,28 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "PGP Manager",
+  "outputfilename": "pgpmanager",
+  "frontend:install": "yarn",
+  "frontend:build": "yarn build",
+  "frontend:dev:watcher": "yarn dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "Dennis Schuster",
+    "email": "hi@dennisschuster.net"
+  },
+  "protocols": [
+    {
+      "name": "pgp-manager",
+      "schemes": [
+        "pgp-manager"
+      ]
+    }
+  ],
+  "info": {
+    "companyName": "Dennis Schuster",
+    "productName": "PGP Manager",
+    "productVersion": "0.0.4",
+    "copyright": "© Copyright 2026 Dennis Schuster. All rights reserved.",
+    "comments": "Simple and Easy to use PGP Manager"
+  }
+}

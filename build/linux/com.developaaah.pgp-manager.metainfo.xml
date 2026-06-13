@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.developaaah.pgp-manager</id>
+
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+
+  <name>PGP Manager</name>
+  <summary>Modern OpenPGP key management and encryption</summary>
+
+  <description>
+    <p>
+      PGP Manager is a cross-platform OpenPGP desktop application for key management,
+      encryption, decryption, digital signatures, and public key discovery.
+    </p>
+    <p>Key features:</p>
+    <ul>
+      <li>Generate, import, and export OpenPGP keys (RSA 2048–4096 and Ed25519)</li>
+      <li>Encrypt, decrypt, sign, and verify text and files</li>
+      <li>Search, import, and publish keys on public keyservers</li>
+      <li>Clipboard monitoring with automatic key and message detection</li>
+      <li>GnuPG keyring integration — existing gpg keys appear automatically</li>
+      <li>Passphrase cache with configurable TTL</li>
+      <li>Portable mode: keep config and keys on a USB drive</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">com.developaaah.pgp-manager.desktop</launchable>
+
+  <url type="homepage">https://github.com/developaaah/pgp-manager</url>
+  <url type="bugtracker">https://github.com/developaaah/pgp-manager/issues</url>
+  <url type="vcs-browser">https://github.com/developaaah/pgp-manager</url>
+
+  <developer>
+    <name>Dennis Schuster</name>
+  </developer>
+
+  <categories>
+    <category>Utility</category>
+    <category>Security</category>
+  </categories>
+
+  <keywords>
+    <keyword>pgp</keyword>
+    <keyword>gpg</keyword>
+    <keyword>openpgp</keyword>
+    <keyword>encryption</keyword>
+    <keyword>security</keyword>
+    <keyword>privacy</keyword>
+    <keyword>cryptography</keyword>
+    <keyword>keys</keyword>
+    <keyword>keyserver</keyword>
+  </keywords>
+
+  <!-- OARS content rating — no objectionable content -->
+  <content_rating type="oars-1.1"/>
+
+  <!--
+    Add real screenshots before submitting to Flathub (at least one required):
+  <screenshots>
+    <screenshot type="default">
+      <caption>Main interface — text encryption</caption>
+      <image type="source" width="1760" height="1040">https://...</image>
+    </screenshot>
+  </screenshots>
+  -->
+
+  <provides>
+    <binary>pgpmanager</binary>
+  </provides>
+
+  <releases>
+    <!-- Keep this list up to date with each release. -->
+    <release version="1.0.0" date="2026-01-01">
+      <description>
+        <p>Initial release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

@@ -1,0 +1,25 @@
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@floating-ui/dom": "^1.5.3",
+    "@melt-ui/svelte": "^0.83.0",
+    "bits-ui": "^0.21.0",
+    "carbon-icons-svelte": "^11.0.0"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^2.4.6",
+    "autoprefixer": "^10.5.0",
+    "postcss": "^8.5.0",
+    "svelte": "^4.2.7",
+    "tailwindcss": "3",
+    "vite": "^4.5.0"
+  }
+}

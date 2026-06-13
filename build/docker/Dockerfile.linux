@@ -1,0 +1,18 @@
+# Builder image for the Linux targets.
+#
+# The Wails Linux backend needs CGO + GTK3/WebKitGTK headers, so Linux binaries
+# are compiled inside a container of the target architecture (non-native arches
+# run via QEMU/Rosetta emulation in Docker Desktop).
+#
+# The frontend is built on the host beforehand (it is platform-independent and
+# embedded via go:embed), so this image needs neither Node nor the Wails CLI —
+# `go build` with the Wails production tags is sufficient.
+ARG GO_VERSION=1.26
+FROM golang:${GO_VERSION}-bookworm
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        gcc \
+        pkg-config \
+        libgtk-3-dev \
+        libwebkit2gtk-4.1-dev \
+    && rm -rf /var/lib/apt/lists/*

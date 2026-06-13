@@ -1,0 +1,11 @@
+.idea/
+.DS_Store
+
+bin/
+build/bin/
+dev/
+
+frontend/node_modules/
+frontend/yarn.lock
+frontend/build/
+frontend/dist/
