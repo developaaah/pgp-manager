@@ -7,11 +7,11 @@ version: '0.0.0'
 summary: Modern OpenPGP key management and encryption
 description: |
   PGP encryption and key management — without the terminal.
-  
+
   PGP Manager is a modern OpenPGP desktop app for Linux. Generate keys,
   encrypt files, sign messages and verify signatures through a clean UI,
   while your clipboard is monitored automatically in the background.
-  
+
   Features:
     - Encrypt, decrypt, sign and verify text and files
     - Clipboard monitoring with one-click actions from the system tray
@@ -27,17 +27,13 @@ source-code: https://github.com/developaaah/pgp-manager
 license: MIT
 
 grade: stable
-confinement: strict
+confinement: classic
 base: core24
 
 apps:
   pgp-manager:
     command: bin/pgpmanager
-    extensions: [gnome]
     desktop: usr/share/applications/com.developaaah.pgp-manager.desktop
-    plugs:
-      - home        # read/write ~/.pgp key storage
-      - network     # keyserver search and publish
 
 parts:
   pgp-manager:
