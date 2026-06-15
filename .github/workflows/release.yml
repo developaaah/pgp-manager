@@ -139,83 +139,80 @@ jobs:
             bin/*.rpm
           if-no-files-found: error
 
-  # ── Snap: amd64 ─────────────────────────────────────────────────────────────
-  snap-amd64:
-    needs: [linux]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+#  snap-amd64:
+#    needs: [linux]
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#
+#      - uses: actions/download-artifact@v4
+#        with:
+#          name: linux-x86
+#          path: bin
+#
+#      - name: Prepare binary and inject version
+#        run: |
+#          VERSION=${{ github.ref_name }}
+#          cp "bin/PGP-Manager_linux_amd_${VERSION}" bin/pgpmanager
+#          chmod +x bin/pgpmanager
+#          sed -i "s/^version: .*/version: '${VERSION#v}'/" snap/snapcraft.yaml
+#
+#      - uses: snapcore/action-build@v1
+#        id: build
+#
+#      - name: Publish to Snap Store
+#        if: env.SNAPCRAFT_STORE_CREDENTIALS != ''
+#        uses: snapcore/action-publish@v1
+#        env:
+#          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAP_STORE_TOKEN }}
+#        with:
+#          snap: ${{ steps.build.outputs.snap }}
+#          release: stable
+#
+#      - uses: actions/upload-artifact@v4
+#        with:
+#          name: snap-amd64
+#          path: ${{ steps.build.outputs.snap }}
+#          if-no-files-found: error
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: linux-x86
-          path: bin
+#  snap-arm64:
+#    needs: [linux-arm]
+#    runs-on: ubuntu-24.04-arm
+#    steps:
+#      - uses: actions/checkout@v4
+#
+#      - uses: actions/download-artifact@v4
+#        with:
+#          name: linux-arm
+#          path: bin
+#
+#      - name: Prepare binary and inject version
+#        run: |
+#          VERSION=${{ github.ref_name }}
+#          cp "bin/PGP-Manager_linux_arm_${VERSION}" bin/pgpmanager
+#          chmod +x bin/pgpmanager
+#          sed -i "s/^version: .*/version: '${VERSION#v}'/" snap/snapcraft.yaml
+#
+#      - uses: snapcore/action-build@v1
+#        id: build
+#
+#      - name: Publish to Snap Store
+#        if: env.SNAPCRAFT_STORE_CREDENTIALS != ''
+#        uses: snapcore/action-publish@v1
+#        env:
+#          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAP_STORE_TOKEN }}
+#        with:
+#          snap: ${{ steps.build.outputs.snap }}
+#          release: stable
+#
+#      - uses: actions/upload-artifact@v4
+#        with:
+#          name: snap-arm64
+#          path: ${{ steps.build.outputs.snap }}
+#          if-no-files-found: error
 
-      - name: Prepare binary and inject version
-        run: |
-          VERSION=${{ github.ref_name }}
-          cp "bin/PGP-Manager_linux_amd_${VERSION}" bin/pgpmanager
-          chmod +x bin/pgpmanager
-          sed -i "s/^version: .*/version: '${VERSION#v}'/" snap/snapcraft.yaml
-
-      - uses: snapcore/action-build@v1
-        id: build
-
-      - name: Publish to Snap Store
-        if: env.SNAPCRAFT_STORE_CREDENTIALS != ''
-        uses: snapcore/action-publish@v1
-        env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAP_STORE_TOKEN }}
-        with:
-          snap: ${{ steps.build.outputs.snap }}
-          release: stable
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: snap-amd64
-          path: ${{ steps.build.outputs.snap }}
-          if-no-files-found: error
-
-  # ── Snap: arm64 ─────────────────────────────────────────────────────────────
-  snap-arm64:
-    needs: [linux-arm]
-    runs-on: ubuntu-24.04-arm
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: linux-arm
-          path: bin
-
-      - name: Prepare binary and inject version
-        run: |
-          VERSION=${{ github.ref_name }}
-          cp "bin/PGP-Manager_linux_arm_${VERSION}" bin/pgpmanager
-          chmod +x bin/pgpmanager
-          sed -i "s/^version: .*/version: '${VERSION#v}'/" snap/snapcraft.yaml
-
-      - uses: snapcore/action-build@v1
-        id: build
-
-      - name: Publish to Snap Store
-        if: env.SNAPCRAFT_STORE_CREDENTIALS != ''
-        uses: snapcore/action-publish@v1
-        env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAP_STORE_TOKEN }}
-        with:
-          snap: ${{ steps.build.outputs.snap }}
-          release: stable
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: snap-arm64
-          path: ${{ steps.build.outputs.snap }}
-          if-no-files-found: error
-
-  # ── GitHub Release with all artifacts ───────────────────────────────────────
   release:
-    needs: [macos, linux, linux-arm, windows, packages, snap-amd64, snap-arm64]
+    needs: [macos, linux, linux-arm, windows, packages] #, snap-amd64, snap-arm64]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4

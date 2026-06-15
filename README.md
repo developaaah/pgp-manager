@@ -43,9 +43,6 @@ Download the latest release for your platform from the [releases page](https://g
   <a href="https://github.com/developaaah/pgp-manager/releases/latest">
     <img src=".assets/download_button.png" alt="Download the latest release" height="75">
   </a>
-  <a href="https://snapcraft.io/pgp-manager">
-    <img src=".assets/snap_button.png" alt="Download from the Snap Store" height="75">
-  </a>
 </p>
 
 * **macOS** — `.dmg` (Apple Silicon / Intel), drag the app into `/Applications`
