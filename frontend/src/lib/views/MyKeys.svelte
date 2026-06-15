@@ -369,18 +369,10 @@
           <div class="flex items-center gap-3 py-[10px]">
 
             <!-- Key type icons -->
-            <div aria-hidden="true"
-                 class="flex items-center gap-[3px] flex-shrink-0 w-[26px]">
-              <svg class="w-[14px] h-[14px] text-blue-500" viewBox="0 0 16 16" fill="none">
-                <circle cx="6" cy="6.5" r="3.5" stroke="currentColor" stroke-width="1.3"/>
-                <path d="M8.5 9l5 5M11 11.5l1.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-              </svg>
+            <div aria-hidden="true" class="flex items-center gap-1 flex-shrink-0 w-[35px]">
+              <svg xmlns="http://www.w3.org/2000/svg" class="block h-4 w-4 text-blue-500" viewBox="0 0 32 32"><path fill="currentColor" d="M16 2a14 14 0 1 0 14 14A14.016 14.016 0 0 0 16 2M4.02 16.394l1.338.446L7 19.303v1.283a1 1 0 0 0 .293.707L10 24v2.377a11.994 11.994 0 0 1-5.98-9.983M16 28a11.968 11.968 0 0 1-2.572-.285L14 26l1.805-4.512a1 1 0 0 0-.097-.926l-1.411-2.117a1 1 0 0 0-.832-.445h-4.93l-1.248-1.873L9.414 14H11v2h2v-2.734l3.868-6.77l-1.736-.992L14.277 7h-2.742L10.45 5.371A11.861 11.861 0 0 1 20 4.7V8a1 1 0 0 0 1 1h1.465a1 1 0 0 0 .832-.445l.877-1.316A12.033 12.033 0 0 1 26.894 11H22.82a1 1 0 0 0-.98.804l-.723 4.47a1 1 0 0 0 .54 1.055L25 19l.685 4.056A11.98 11.98 0 0 1 16 28"/></svg>
               {#if key.IsPrivate}
-                <svg class="w-[12px] h-[12px] text-purple-500" viewBox="0 0 16 16" fill="none">
-                  <rect x="3.5" y="7.5" width="9" height="7" rx="1.2" stroke="currentColor" stroke-width="1.3"/>
-                  <path d="M5.5 7.5V5.5a2.5 2.5 0 015 0v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-                  <circle cx="8" cy="11" r="1" fill="currentColor"/>
-                </svg>
+                <svg xmlns="http://www.w3.org/2000/svg" class="block h-4 w-4 text-purple-500" viewBox="0 0 32 32"><path fill="currentColor" d="M24 14h-2V8a6 6 0 0 0-12 0v6H8a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V16a2 2 0 0 0-2-2M12 8a4 4 0 0 1 8 0v6h-8Zm12 20H8V16h16Z"/></svg>
               {/if}
             </div>
 

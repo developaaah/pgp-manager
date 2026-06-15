@@ -86,13 +86,16 @@
     <div class="flex items-center gap-3 mb-4">
       <div aria-hidden="true"
            class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0
-                  {isPrivate ? 'bg-purple-500/15' : 'bg-pgp-accent-bg'}">
-        <svg aria-hidden="true" class="w-5 h-5 {isPrivate ? 'text-purple-400' : 'text-pgp-accent'}"
-             viewBox="0 0 16 16" fill="none">
-          <circle cx="6" cy="7" r="3" stroke="currentColor" stroke-width="1.25"/>
-          <path d="M8.2 9.2l5.3 5.3" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/>
-          <path d="M11.5 12l.5-.5M13 13.5l.5-.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-        </svg>
+                  {isPrivate ? 'bg-purple-500/15' : 'bg-blue-500/15'}">
+        {#if isPrivate}
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-purple-500" viewBox="0 0 32 32">
+            <path fill="currentColor" d="M24 14h-2V8a6 6 0 0 0-12 0v6H8a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V16a2 2 0 0 0-2-2M12 8a4 4 0 0 1 8 0v6h-8Zm12 20H8V16h16Z"/>
+          </svg>
+        {:else}
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-blue-500" viewBox="0 0 32 32">
+            <path fill="currentColor" d="M16 2a14 14 0 1 0 14 14A14.016 14.016 0 0 0 16 2M4.02 16.394l1.338.446L7 19.303v1.283a1 1 0 0 0 .293.707L10 24v2.377a11.994 11.994 0 0 1-5.98-9.983M16 28a11.968 11.968 0 0 1-2.572-.285L14 26l1.805-4.512a1 1 0 0 0-.097-.926l-1.411-2.117a1 1 0 0 0-.832-.445h-4.93l-1.248-1.873L9.414 14H11v2h2v-2.734l3.868-6.77l-1.736-.992L14.277 7h-2.742L10.45 5.371A11.861 11.861 0 0 1 20 4.7V8a1 1 0 0 0 1 1h1.465a1 1 0 0 0 .832-.445l.877-1.316A12.033 12.033 0 0 1 26.894 11H22.82a1 1 0 0 0-.98.804l-.723 4.47a1 1 0 0 0 .54 1.055L25 19l.685 4.056A11.98 11.98 0 0 1 16 28"/>
+          </svg>
+        {/if}
       </div>
       <div>
         <h2 class="text-[15px] font-semibold text-pgp-text tracking-[-0.01em]">
