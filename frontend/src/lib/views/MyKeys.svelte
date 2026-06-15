@@ -61,6 +61,9 @@
     return (k.PrimaryUID || '').toLowerCase().includes(q)
         || (k.Email || '').toLowerCase().includes(q)
         || (k.Fingerprint || '').toLowerCase().includes(q)
+  }).sort((a, b) => {
+    if (a.IsPrivate !== b.IsPrivate) return a.IsPrivate ? -1 : 1
+    return (a.PrimaryUID || a.Email || '').localeCompare(b.PrimaryUID || b.Email || '')
   })
 
   function isPrivateArmored(text) {

@@ -17,7 +17,10 @@
     (k.PrimaryUID || '').toLowerCase().includes(search.toLowerCase()) ||
     (k.Email || '').toLowerCase().includes(search.toLowerCase()) ||
     k.Fingerprint.toLowerCase().includes(search.toLowerCase())
-  )
+  ).sort((a, b) => {
+    if (a.IsPrivate !== b.IsPrivate) return a.IsPrivate ? 1 : -1
+    return (a.PrimaryUID || a.Email || '').localeCompare(b.PrimaryUID || b.Email || '')
+  })
 
   async function load() {
     loading = true; error = ''
