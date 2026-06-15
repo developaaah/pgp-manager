@@ -3,20 +3,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/developaaah/pgp-manager/actions/workflows/release.yml">
-    <img src="https://github.com/developaaah/pgp-manager/actions/workflows/release.yml/badge.svg" alt="Release Status"/>
-  </a>
-  <a href="https://github.com/developaaah/pgp-manager/releases/latest">
-    <img alt="Latest Release" src="https://img.shields.io/github/v/release/developaaah/pgp-manager?style=flat-square&color=green">
-  </a>
-  <a href="https://snapcraft.io/pgp-manager">
-    <img alt="pgp-manager" src="https://snapcraft.io/pgp-manager/badge.svg" />
-  </a>
-  <a href="https://snapcraft.io/pgp-manager">
-    <img alt="pgp-manager" src="https://snapcraft.io/pgp-manager/trending.svg?name=0" />
-  </a>  
-  <img alt="Issues or Pull Requests" src="https://img.shields.io/github/issues/developaaah/pgp-manager">
-  <img alt="License" src="https://img.shields.io/github/license/developaaah/pgp-manager">
+<a href="https://github.com/developaaah/pgp-manager/actions/workflows/release.yml"><img src="https://github.com/developaaah/pgp-manager/actions/workflows/release.yml/badge.svg" alt="Release Status"/></a>
+<a href="https://github.com/developaaah/pgp-manager/releases/latest"><img alt="Latest Release" src="https://img.shields.io/github/v/release/developaaah/pgp-manager?color=green"></a>
+<a href="https://github.com/developaaah/pgp-manager/issues"><img alt="Issues or Pull Requests" src="https://img.shields.io/github/issues/developaaah/pgp-manager"></a>
+<img alt="License" src="https://img.shields.io/github/license/developaaah/pgp-manager">
 </p>
 
 # PGP Manager
@@ -262,9 +252,10 @@ Yes. It speaks standard OpenPGP (RFC 4880), so messages and keys are interoperab
 <br><br>
 
 ## Local Development
-
+<p>
 <img alt="Go version" src="https://img.shields.io/github/go-mod/go-version/developaaah/pgp-manager">
 <img alt="Wails version" src="https://img.shields.io/badge/Wails-v2-blue">
+</p>
 
 ### Prerequisites
 
