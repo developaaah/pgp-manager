@@ -7,6 +7,7 @@
 <a href="https://github.com/developaaah/pgp-manager/releases/latest"><img alt="Latest Release" src="https://img.shields.io/github/v/release/developaaah/pgp-manager?color=green"></a>
 <a href="https://github.com/developaaah/pgp-manager/issues"><img alt="Issues or Pull Requests" src="https://img.shields.io/github/issues/developaaah/pgp-manager"></a>
 <img alt="License" src="https://img.shields.io/github/license/developaaah/pgp-manager">
+<a href="https://gitgem.org/github/developaaah/pgp-manager"><img src="https://gitgem.org/api/badge/github/developaaah/pgp-manager.svg" alt="GitGem"></a>
 </p>
 
 # PGP Manager
