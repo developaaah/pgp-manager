@@ -14,6 +14,7 @@ void pgp_set_dock_icon_visible(int visible);
 import "C"
 
 import (
+	"strings"
 	"unsafe"
 
 	"github.com/developaaah/pgp-manager/backend/tray/icons"
@@ -36,16 +37,17 @@ func pgpGoServiceFired(action *C.char, text *C.char) {
 }
 
 // pgpGoFileServiceFired is called from Objective-C when the user invokes a
-// "PGP: … File" entry on a Finder selection. Fired once per selected file.
+// "PGP: … File" entry on a Finder selection. Fired once per invocation with
+// all selected paths newline-joined.
 //
 //export pgpGoFileServiceFired
-func pgpGoFileServiceFired(action *C.char, path *C.char) {
+func pgpGoFileServiceFired(action *C.char, paths *C.char) {
 	if serviceApp == nil {
 		return
 	}
 	act := C.GoString(action)
-	p := C.GoString(path)
-	go serviceApp.runFileAction(act, p)
+	list := strings.Split(C.GoString(paths), "\n")
+	go serviceApp.runFileAction(act, list)
 }
 
 // pgpGoTrayAction is called from Objective-C when a tray menu item is clicked.

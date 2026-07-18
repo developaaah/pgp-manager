@@ -9,7 +9,7 @@
     FindDecryptionKey, GetCachedPassphrase, HasCachedPassphrase, CachePassphrase, ReadClipboard,
     GetConfig, SetClipboardText
   } from '../../../wailsjs/go/main/App'
-  import { pendingClipboardMessage } from '../../stores.js'
+  import { pendingClipboardMessage, pendingEncryptText } from '../../stores.js'
 
   let text = ''
   let prevText = null
@@ -62,6 +62,15 @@
     prevText = null
     error = ''
     handleDecrypt()
+  }
+
+  $: if ($pendingEncryptText !== null) {
+    const plain = $pendingEncryptText
+    pendingEncryptText.set(null)
+    text = plain
+    prevText = null
+    error = ''
+    handleEncrypt()
   }
 
   let autoCopy = false

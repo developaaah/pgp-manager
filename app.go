@@ -197,7 +197,7 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	runtime.OnFileDrop(ctx, func(x, y int, paths []string) {
 		if len(paths) > 0 {
-			runtime.EventsEmit(ctx, "file-drop", paths[0])
+			runtime.EventsEmit(ctx, "file-drop", paths)
 		}
 	})
 	// Ctrl+C / SIGTERM must terminate the app even in tray mode — Wails'
@@ -1109,7 +1109,7 @@ func (a *App) runTextAction(action, text string) {
 	case "import-key":
 		a.importKeyAction(text)
 	case "encrypt-text":
-		a.encryptTextAction(text, true)
+		a.encryptTextRequest(text)
 	case "decrypt-text":
 		a.decryptTextAction(text, true)
 	case "sign-text":
@@ -1121,24 +1121,30 @@ func (a *App) runTextAction(action, text string) {
 	}
 }
 
-// runFileAction executes a file-based context action (macOS Finder services).
-// Results are written next to the input file — no window is opened.
-func (a *App) runFileAction(action, path string) {
+// runFileAction executes a file-based context action (macOS Finder services)
+// for all files of the Finder selection. Encrypt opens the recipient picker
+// with the whole selection; the other actions run per file and write their
+// results next to the input file.
+func (a *App) runFileAction(action string, paths []string) {
 	if a.store == nil { // first-run setup not completed yet
 		a.showMainWindow()
 		return
 	}
+	if len(paths) == 0 {
+		return
+	}
+	if action == "encrypt-file" {
+		a.encryptFilesRequest(paths)
+		return
+	}
+	for _, path := range paths {
+		a.runSingleFileAction(action, path)
+	}
+}
+
+// runSingleFileAction executes a headless file action on one file.
+func (a *App) runSingleFileAction(action, path string) {
 	switch action {
-	case "encrypt-file":
-		fp := a.defaultKeyFingerprint()
-		if fp == "" {
-			a.emitActionResult(model.ActionResult{Action: "encrypt-file", Error: "No key available — import a key first"})
-			return
-		}
-		r := bcrypto.EncryptFileWithOutput(a.store, path, []string{fp}, path+".gpg", "")
-		if r.Error != "" {
-			a.emitActionResult(model.ActionResult{Action: "encrypt-file", Error: r.Error})
-		}
 	case "decrypt-file":
 		fp := bcrypto.FindDecryptionKeyFromFile(a.store, path)
 		passphrase := ""
@@ -1209,11 +1215,11 @@ func (a *App) handleTrayAction(action string) {
 	}
 }
 
-// encryptTextFromClipboard encrypts the clipboard text and shows the result
-// in the main window.
+// encryptTextFromClipboard loads the clipboard text into the encrypt view
+// and opens the recipient picker.
 func (a *App) encryptTextFromClipboard() {
 	text, _ := runtime.ClipboardGetText(a.ctx)
-	a.encryptTextAction(text, true)
+	a.encryptTextRequest(text)
 }
 
 // signTextFromClipboard signs the clipboard text and shows the result in the
@@ -1318,19 +1324,19 @@ func (a *App) decryptTextAction(text string, window bool) {
 	a.setClipboardSilent(r.Plaintext)
 }
 
-func (a *App) encryptTextAction(text string, window bool) {
-	// Encrypt to the user's own key (first private key in the store).
-	fp := a.defaultKeyFingerprint()
-	if fp == "" {
-		a.emitActionResult(model.ActionResult{Action: "encrypt-text", Error: "No key available — import a key first"})
-		return
-	}
-	r := bcrypto.EncryptText(a.store, text, []string{fp}, "", "")
-	if window || r.Error != "" {
-		a.emitActionResult(model.ActionResult{Action: "encrypt-text", Output: r.Armored, Error: r.Error})
-		return
-	}
-	a.setClipboardSilent(r.Armored)
+// encryptTextRequest loads text into the encrypt view and opens the
+// recipient picker there — encryption happens in the UI once the user has
+// chosen recipients (context action and tray behave identically).
+func (a *App) encryptTextRequest(text string) {
+	a.showMainWindow()
+	runtime.EventsEmit(a.ctx, "encrypt-text-requested", text)
+}
+
+// encryptFilesRequest loads files into the encrypt view and opens the
+// recipient picker there (the Finder service behaves like the text service).
+func (a *App) encryptFilesRequest(paths []string) {
+	a.showMainWindow()
+	runtime.EventsEmit(a.ctx, "encrypt-file-requested", paths)
 }
 
 // signTextToWindow signs text and presents the result in the UI (tray action).

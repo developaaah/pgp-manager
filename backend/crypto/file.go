@@ -40,7 +40,8 @@ func EncryptFile(ks *keystore.Store, inputPath string, recipientFingerprints []s
 		signedData = inputData
 	}
 
-	// 2. Recipient-Keys auflösen
+	// 2. Recipient-Keys auflösen — always use the public part, never a
+	// locked private key (gopenpgp rejects locked keys in an encryption keyring).
 	pgpHandle := crypto.PGPWithProfile(profile.RFC4880())
 	recipients := make([]*crypto.Key, 0, len(recipientFingerprints))
 	for _, fp := range recipientFingerprints {
@@ -53,6 +54,13 @@ func EncryptFile(ks *keystore.Store, inputPath string, recipientFingerprints []s
 		if err != nil {
 			slog.Warn("invalid recipient key", "fingerprint", fp, "error", err)
 			continue
+		}
+		if key.IsPrivate() {
+			key, err = key.ToPublic()
+			if err != nil {
+				slog.Warn("failed to extract public key", "fingerprint", fp, "error", err)
+				continue
+			}
 		}
 		recipients = append(recipients, key)
 	}
