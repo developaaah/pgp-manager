@@ -182,6 +182,10 @@ export function PreviewKeys(arg1) {
   return window['go']['main']['App']['PreviewKeys'](arg1);
 }
 
+export function ProvidePassphrase(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ProvidePassphrase'](arg1, arg2, arg3);
+}
+
 export function PublishToKeyserver(arg1, arg2) {
   return window['go']['main']['App']['PublishToKeyserver'](arg1, arg2);
 }

@@ -92,6 +92,8 @@ export function OpenFolder(arg1:string):Promise<void>;
 
 export function PreviewKeys(arg1:string):Promise<Array<model.KeyInfo>>;
 
+export function ProvidePassphrase(arg1:number,arg2:string,arg3:boolean):Promise<void>;
+
 export function PublishToKeyserver(arg1:string,arg2:string):Promise<void>;
 
 export function ReadClipboard():Promise<string>;

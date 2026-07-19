@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -62,8 +63,8 @@ type App struct {
 	clipMu       sync.Mutex
 	clipSuppress string
 
-	// availableUpdate is set once by checkForUpdate() when a newer release
-	// exists on GitHub. Empty string means up-to-date or check not done yet.
+	// availableUpdate is set by checkForUpdate() when a newer release exists
+	// on GitHub. Empty string means up-to-date or no check done yet.
 	availableUpdate string
 
 	// encBatch collects encrypt-file context requests arriving in quick
@@ -78,6 +79,26 @@ type App struct {
 	// action events emitted earlier would be silently lost.
 	frontendReady chan struct{}
 	readyOnce     sync.Once
+
+	// windowVisible tracks whether the main window is on screen; the update
+	// check runs on every hidden→visible transition ("when the UI opens"),
+	// not while the app only sits in the tray.
+	winMu          sync.Mutex
+	windowVisible  bool
+	updateChecking atomic.Bool
+
+	// ppWaiters holds pending passphrase prompts: request id → reply channel.
+	// Actions triggered from the tray or a context menu block on the channel
+	// until the frontend answers via ProvidePassphrase.
+	ppMu      sync.Mutex
+	ppSeq     int
+	ppWaiters map[int]chan ppReply
+}
+
+// ppReply is the frontend's answer to a passphrase prompt.
+type ppReply struct {
+	passphrase string
+	ok         bool
 }
 
 // NewApp creates a new App with config, store, and cache initialized.
@@ -111,7 +132,11 @@ func NewApp() *App {
 		cache:         cache.NewPassphraseCache(ctx, ttl),
 		pgpHandle:     crypto.PGPWithProfile(profile.RFC4880()),
 		frontendReady: make(chan struct{}),
+		ppWaiters:     make(map[int]chan ppReply),
 	}
+	// Mirrors the StartHidden option: in tray mode the window is not shown
+	// at launch, so the first update check waits for the first UI open.
+	app.windowVisible = !(cfg.StartInTray && !needsSetup)
 
 	if !needsSetup {
 		store, err := keystore.New(cfg)
@@ -228,7 +253,11 @@ func (a *App) startup(ctx context.Context) {
 		}
 	}()
 	go func() { _ = a.notifier.RequestPermission(ctx) }()
-	go a.checkForUpdate()
+	// The update check runs on every UI open; a launch with visible window
+	// counts as the first open (tray-only starts check on first show).
+	if a.windowVisible {
+		go a.checkForUpdate()
+	}
 	registerServices(a)
 	if !a.needsSetup {
 		go a.watchClipboard(ctx)
@@ -249,6 +278,7 @@ func (a *App) beforeClose(ctx context.Context) bool {
 		return false
 	}
 	if a.cfg.StartInTray {
+		a.markWindowHidden()
 		runtime.WindowHide(ctx)
 		return true // prevent termination
 	}
@@ -437,11 +467,16 @@ func (a *App) GetAvailableUpdate() string {
 }
 
 // checkForUpdate fetches the latest GitHub release and emits "update:available"
-// if a newer version exists. Runs in a goroutine during startup.
+// if a newer version exists. Runs in a goroutine on every UI open
+// (hidden→visible transition); concurrent runs are collapsed.
 func (a *App) checkForUpdate() {
 	if appVersion == "dev" || !strings.HasPrefix(appVersion, "v") {
 		return
 	}
+	if !a.updateChecking.CompareAndSwap(false, true) {
+		return
+	}
+	defer a.updateChecking.Store(false)
 	client := &http.Client{Timeout: 8 * time.Second}
 	req, err := http.NewRequestWithContext(a.ctx, http.MethodGet,
 		"https://api.github.com/repos/developaaah/pgp-manager/releases/latest", nil)
@@ -466,7 +501,9 @@ func (a *App) checkForUpdate() {
 	}
 	if semverLess(appVersion, data.TagName) {
 		a.availableUpdate = data.TagName
-		runtime.EventsEmit(a.ctx, "update:available", data.TagName)
+		a.whenFrontendReady(func() {
+			runtime.EventsEmit(a.ctx, "update:available", data.TagName)
+		})
 	}
 }
 
@@ -1015,6 +1052,7 @@ func (a *App) OpenDirectoryDialog() (string, error) {
 //bind
 func (a *App) WindowClose() {
 	if a.cfg.StartInTray {
+		a.markWindowHidden()
 		runtime.WindowHide(a.ctx)
 		return
 	}
@@ -1072,6 +1110,90 @@ func (a *App) whenFrontendReady(fn func()) {
 		case <-a.ctx.Done():
 		}
 	}()
+}
+
+// ── Passphrase prompt (tray / context actions) ────────────────────────────────
+
+// requestPassphrase opens the passphrase dialog in the frontend and blocks
+// until the user answers or the app shuts down. Must only be called from
+// action goroutines, never from the main thread. ok is false on cancel.
+func (a *App) requestPassphrase(keyLabel string) (passphrase string, ok bool) {
+	a.ppMu.Lock()
+	a.ppSeq++
+	id := a.ppSeq
+	ch := make(chan ppReply, 1)
+	a.ppWaiters[id] = ch
+	a.ppMu.Unlock()
+	defer func() {
+		a.ppMu.Lock()
+		delete(a.ppWaiters, id)
+		a.ppMu.Unlock()
+	}()
+
+	a.whenFrontendReady(func() {
+		a.showMainWindow()
+		runtime.EventsEmit(a.ctx, "passphrase-requested", map[string]interface{}{
+			"id":       id,
+			"keyLabel": keyLabel,
+		})
+	})
+
+	select {
+	case r := <-ch:
+		return r.passphrase, r.ok
+	case <-a.ctx.Done():
+		return "", false
+	}
+}
+
+// ProvidePassphrase delivers the frontend's answer to a passphrase prompt.
+// Unknown or already-answered ids are ignored.
+//
+//bind
+func (a *App) ProvidePassphrase(id int, passphrase string, cancelled bool) {
+	a.ppMu.Lock()
+	ch, ok := a.ppWaiters[id]
+	if ok {
+		delete(a.ppWaiters, id)
+	}
+	a.ppMu.Unlock()
+	if ok {
+		ch <- ppReply{passphrase: passphrase, ok: !cancelled}
+	}
+}
+
+// passphraseFor resolves the passphrase for a stored private key: cached
+// value, empty for unprotected keys, otherwise by prompting the user
+// (blocking). ok is false when the user cancelled the prompt. Callers cache
+// the passphrase themselves after the operation succeeded.
+func (a *App) passphraseFor(fp string) (passphrase string, ok bool) {
+	if pp := a.cache.Get(fp); pp != "" {
+		return pp, true
+	}
+	if !bcrypto.KeyLocked(a.store, fp) {
+		return "", true
+	}
+	return a.requestPassphrase(a.keyLabel(fp))
+}
+
+// keyLabel returns a human-readable label for the passphrase prompt.
+func (a *App) keyLabel(fp string) string {
+	keys, _ := a.store.List()
+	for _, k := range keys {
+		if k.Fingerprint != fp {
+			continue
+		}
+		switch {
+		case k.PrimaryUID != "" && k.Email != "":
+			return k.PrimaryUID + " <" + k.Email + ">"
+		case k.Email != "":
+			return k.Email
+		case k.PrimaryUID != "":
+			return k.PrimaryUID
+		}
+		break
+	}
+	return fp
 }
 
 // handleContextArgs dispatches a context-menu invocation passed as CLI
@@ -1161,20 +1283,22 @@ func (a *App) handleActionRequest(rawURL string) {
 	action := u.Host
 	params := u.Query()
 
+	// Actions run in goroutines: this dispatcher may be called on the main
+	// thread (OnUrlOpen), and actions can block on the passphrase prompt.
 	switch action {
 	case "import-key":
 		text, _ := textFromParams(params)
-		a.importKeyAction(text)
+		go a.importKeyAction(text)
 	case "decrypt-clipboard":
 		// The message to decrypt is in the clipboard (tray action).
-		a.decryptToWindow("")
+		go a.decryptToWindow("")
 	case "decrypt-text", "encrypt-text", "sign-text", "verify-text":
 		text, err := textFromParams(params)
 		if err != nil {
 			a.emitActionResult(model.ActionResult{Action: action, Error: err.Error()})
 			return
 		}
-		a.runTextAction(action, text)
+		go a.runTextAction(action, text)
 	default:
 		slog.Warn("context action: unknown action", "action", action)
 	}
@@ -1182,8 +1306,9 @@ func (a *App) handleActionRequest(rawURL string) {
 
 // runTextAction executes a text-based context action (called from the URL
 // dispatcher and directly from the macOS services bridge). The actions
-// behave exactly like their tray counterparts: encrypt/decrypt/sign open
-// the window with the result, verify reports via notification.
+// behave exactly like their tray counterparts: encrypt/decrypt/sign load
+// the content into the text view and continue there, verify reports via
+// notification.
 func (a *App) runTextAction(action, text string) {
 	if a.store == nil { // first-run setup not completed yet
 		a.showMainWindow()
@@ -1195,9 +1320,9 @@ func (a *App) runTextAction(action, text string) {
 	case "encrypt-text":
 		a.encryptTextRequest(text)
 	case "decrypt-text":
-		a.decryptTextAction(text, true)
+		a.decryptTextRequest(text)
 	case "sign-text":
-		a.signTextToWindow(text)
+		a.signTextRequest(text)
 	case "verify-text":
 		a.verifyTextAction(text)
 	default:
@@ -1261,11 +1386,19 @@ func (a *App) runSingleFileAction(action, path string) {
 		fp := bcrypto.FindDecryptionKeyFromFile(a.store, path)
 		passphrase := ""
 		if fp != "" {
-			passphrase = a.cache.Get(fp)
+			var ok bool
+			passphrase, ok = a.passphraseFor(fp)
+			if !ok {
+				return // user cancelled the passphrase prompt
+			}
 		}
 		r := bcrypto.DecryptFile(a.store, path, fp, passphrase)
 		if r.Error != "" {
 			a.emitActionResult(model.ActionResult{Action: "decrypt-file", Error: r.Error})
+			return
+		}
+		if passphrase != "" {
+			a.cache.Set(fp, passphrase)
 		}
 	case "sign-file":
 		fp := a.defaultKeyFingerprint()
@@ -1273,9 +1406,17 @@ func (a *App) runSingleFileAction(action, path string) {
 			a.emitActionResult(model.ActionResult{Action: "sign-file", Error: "No private key available — import a private key first"})
 			return
 		}
-		r := bcrypto.SignFile(a.store, path, path+".asc", fp, a.cache.Get(fp))
+		passphrase, ok := a.passphraseFor(fp)
+		if !ok {
+			return // user cancelled the passphrase prompt
+		}
+		r := bcrypto.SignFile(a.store, path, path+".asc", fp, passphrase)
 		if r.Error != "" {
 			a.emitActionResult(model.ActionResult{Action: "sign-file", Error: r.Error})
+			return
+		}
+		if passphrase != "" {
+			a.cache.Set(fp, passphrase)
 		}
 	case "verify-file":
 		r := bcrypto.VerifyFile(a.store, path)
@@ -1309,19 +1450,21 @@ func (a *App) handleTrayAction(action string) {
 		a.showMainWindow()
 		return
 	}
+	// Actions run in goroutines so a blocking passphrase prompt can never
+	// stall the tray's event handling.
 	switch action {
 	case "open", "quit":
 		// handled above
 	case "encrypt-clipboard":
-		a.encryptTextFromClipboard()
+		go a.encryptTextFromClipboard()
 	case "decrypt-clipboard":
-		a.decryptToWindow("")
+		go a.decryptToWindow("")
 	case "sign-clipboard":
-		a.signTextFromClipboard()
+		go a.signTextFromClipboard()
 	case "verify-clipboard":
-		a.verifyTextFromClipboard()
+		go a.verifyTextFromClipboard()
 	case "import-clipboard":
-		a.importKeyAction("")
+		go a.importKeyAction("")
 	default:
 		slog.Warn("tray: unknown action", "action", action)
 	}
@@ -1334,11 +1477,11 @@ func (a *App) encryptTextFromClipboard() {
 	a.encryptTextRequest(text)
 }
 
-// signTextFromClipboard signs the clipboard text and shows the result in the
-// main window.
+// signTextFromClipboard loads the clipboard text into the text view and
+// opens its sign flow.
 func (a *App) signTextFromClipboard() {
 	text, _ := runtime.ClipboardGetText(a.ctx)
-	a.signTextToWindow(text)
+	a.signTextRequest(text)
 }
 
 // verifyTextFromClipboard verifies the signed message in the clipboard and
@@ -1416,28 +1559,41 @@ func (a *App) importKeyAction(text string) {
 	})
 }
 
-// decryptToWindow decrypts armored text (clipboard when empty) and presents
-// the result in the UI. Used by notifications, the tray menu, and the
-// "Decrypt in New Window" service.
+// decryptToWindow loads armored text (clipboard when empty) into the text
+// view, which runs its own decrypt flow. Used by the tray menu and the
+// decrypt context actions.
 func (a *App) decryptToWindow(armored string) {
 	if strings.TrimSpace(armored) == "" {
 		armored, _ = runtime.ClipboardGetText(a.ctx)
 	}
-	a.decryptTextAction(armored, true)
+	a.decryptTextRequest(armored)
 }
 
-func (a *App) decryptTextAction(text string, window bool) {
-	fp := bcrypto.FindDecryptionKey(a.store, text)
-	passphrase := ""
-	if fp != "" {
-		passphrase = a.cache.Get(fp)
-	}
-	r := bcrypto.DecryptText(a.store, text, fp, passphrase, false)
-	if window || r.Error != "" {
-		a.emitActionResult(model.ActionResult{Action: "decrypt-text", Output: r.Plaintext, Error: r.Error})
+// decryptTextRequest loads armored text into the text view and starts the
+// decrypt flow there — passphrase prompt and plaintext live in the editor,
+// not in a result popup. Also used by the clipboard auto-detect.
+func (a *App) decryptTextRequest(text string) {
+	if strings.TrimSpace(text) == "" {
+		a.emitActionResult(model.ActionResult{Action: "decrypt-text", Error: "No text to decrypt — the clipboard or selection is empty"})
 		return
 	}
-	a.setClipboardSilent(r.Plaintext)
+	a.whenFrontendReady(func() {
+		a.showMainWindow()
+		runtime.EventsEmit(a.ctx, "decrypt-text-requested", text)
+	})
+}
+
+// signTextRequest loads text into the text view and opens its sign flow
+// (signing-key selection and passphrase prompt happen in the view).
+func (a *App) signTextRequest(text string) {
+	if strings.TrimSpace(text) == "" {
+		a.emitActionResult(model.ActionResult{Action: "sign-text", Error: "No text to sign — the clipboard or selection is empty"})
+		return
+	}
+	a.whenFrontendReady(func() {
+		a.showMainWindow()
+		runtime.EventsEmit(a.ctx, "sign-text-requested", text)
+	})
 }
 
 // encryptTextRequest loads text into the encrypt view and opens the
@@ -1461,17 +1617,6 @@ func (a *App) encryptFilesRequest(paths []string) {
 		a.showMainWindow()
 		runtime.EventsEmit(a.ctx, "encrypt-file-requested", paths)
 	})
-}
-
-// signTextToWindow signs text and presents the result in the UI (tray action).
-func (a *App) signTextToWindow(text string) {
-	fp := a.defaultKeyFingerprint()
-	if fp == "" {
-		a.emitActionResult(model.ActionResult{Action: "sign-text", Error: "No private key available — import a private key first"})
-		return
-	}
-	r := bcrypto.SignText(a.store, text, fp, a.cache.Get(fp))
-	a.emitActionResult(model.ActionResult{Action: "sign-text", Output: r.Armored, Error: r.Error})
 }
 
 func (a *App) verifyTextAction(text string) {
@@ -1611,10 +1756,7 @@ func (a *App) dispatchClipboard(trimmed string) {
 		if bcrypto.FindDecryptionKey(a.store, trimmed) == "" {
 			return
 		}
-		a.whenFrontendReady(func() {
-			a.showMainWindow()
-			runtime.EventsEmit(a.ctx, "clipboard-message-detected", trimmed)
-		})
+		a.decryptTextRequest(trimmed)
 	}
 }
 
@@ -1646,11 +1788,29 @@ func (a *App) clipboardKeyDetected(armored, mode string) {
 }
 
 // showMainWindow ensures the Wails window is visible and focused on the
-// currently active workspace (the app may live in the tray).
+// currently active workspace (the app may live in the tray). Every
+// hidden→visible transition triggers an update check.
 func (a *App) showMainWindow() {
+	a.winMu.Lock()
+	opened := !a.windowVisible
+	a.windowVisible = true
+	a.winMu.Unlock()
+
 	prepareWindowForShow()
 	runtime.WindowShow(a.ctx)
 	runtime.WindowCenter(a.ctx)
+
+	if opened {
+		go a.checkForUpdate()
+	}
+}
+
+// markWindowHidden records that the main window left the screen, so the next
+// showMainWindow counts as a UI open again.
+func (a *App) markWindowHidden() {
+	a.winMu.Lock()
+	a.windowVisible = false
+	a.winMu.Unlock()
 }
 
 // EncryptFileWithOutput encrypts a file for the given recipients and writes to outputPath.

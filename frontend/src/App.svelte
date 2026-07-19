@@ -8,10 +8,11 @@
   import Sidebar from './lib/Sidebar.svelte'
   import ImportKeyModal from './modals/ImportKeyModal.svelte'
   import ActionResultModal from './modals/ActionResultModal.svelte'
+  import PassphraseModal from './modals/PassphraseModal.svelte'
   import SetupModal from './modals/SetupModal.svelte'
-  import { GetPlatform, GetConfig, NeedsSetup, GetAvailableUpdate, FrontendReady } from '../wailsjs/go/main/App'
+  import { GetPlatform, GetConfig, NeedsSetup, GetAvailableUpdate, FrontendReady, ProvidePassphrase } from '../wailsjs/go/main/App'
   import { EventsOn, EventsOff } from '../wailsjs/runtime/runtime'
-  import { themeOverride, pendingImportArmored, pendingClipboardMessage, pendingEncryptText, pendingEncryptFiles, availableUpdate } from './stores.js'
+  import { themeOverride, pendingImportArmored, pendingDecryptText, pendingSignText, pendingEncryptText, pendingEncryptFiles, availableUpdate } from './stores.js'
 
   let activeView = 'text'
   let platform = 'darwin'
@@ -27,6 +28,19 @@
   let actionResultAction = ''
   let actionResultOutput = ''
   let actionResultError = ''
+
+  // Global passphrase prompt for tray/context actions — the backend blocks
+  // until ProvidePassphrase answers the request id.
+  let ppReqOpen = false
+  let ppReqId = 0
+  let ppReqLabel = ''
+  let ppReqAnswered = false
+
+  function answerPassphrase(passphrase, cancelled) {
+    if (ppReqAnswered) return
+    ppReqAnswered = true
+    ProvidePassphrase(ppReqId, passphrase, cancelled).catch(() => {})
+  }
 
   const mq = typeof window !== 'undefined'
     ? window.matchMedia('(prefers-color-scheme: dark)')
@@ -77,9 +91,14 @@
       pendingImportArmored.set(armored)
     })
 
-    EventsOn('clipboard-message-detected', (armored) => {
+    EventsOn('decrypt-text-requested', (armored) => {
       activeView = 'text'
-      pendingClipboardMessage.set(armored)
+      pendingDecryptText.set(armored)
+    })
+
+    EventsOn('sign-text-requested', (text) => {
+      activeView = 'text'
+      pendingSignText.set(text)
     })
 
     EventsOn('encrypt-text-requested', (text) => {
@@ -95,6 +114,18 @@
       pendingEncryptFiles.update(prev => (prev ? [...prev, ...arr] : arr))
     })
 
+    EventsOn('passphrase-requested', (req) => {
+      // A newer request supersedes an unanswered one — cancel the old
+      // waiter so its action goroutine does not hang.
+      if (ppReqOpen && !ppReqAnswered) {
+        ProvidePassphrase(ppReqId, '', true).catch(() => {})
+      }
+      ppReqId = req.id
+      ppReqLabel = req.keyLabel || ''
+      ppReqAnswered = false
+      ppReqOpen = true
+    })
+
     // Backend action events are gated until the listeners above exist.
     FrontendReady().catch(() => {})
 
@@ -104,9 +135,11 @@
       EventsOff('notification:imported')
       EventsOff('action:result')
       EventsOff('clipboard-key-detected')
-      EventsOff('clipboard-message-detected')
+      EventsOff('decrypt-text-requested')
+      EventsOff('sign-text-requested')
       EventsOff('encrypt-text-requested')
       EventsOff('encrypt-file-requested')
+      EventsOff('passphrase-requested')
       EventsOff('update:available')
     }
   })
@@ -194,5 +227,14 @@
       on:close={() => { actionResultOpen = false }}
     />
   {/if}
+
+  <PassphraseModal
+    bind:open={ppReqOpen}
+    keyLabel={ppReqLabel}
+    confirmLabel="Unlock"
+    allowEmpty={true}
+    on:confirm={(e) => { answerPassphrase(e.detail.passphrase, false); ppReqOpen = false }}
+    on:close={() => answerPassphrase('', true)}
+  />
 
 </div>
