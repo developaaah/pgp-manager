@@ -14,6 +14,10 @@ export function CachePassphrase(arg1:string,arg2:string):Promise<void>;
 
 export function ConfirmSetup(arg1:string):Promise<void>;
 
+export function ContextMenuInstalled():Promise<boolean>;
+
+export function ContextMenuSupported():Promise<boolean>;
+
 export function DecryptFile(arg1:string,arg2:string,arg3:string):Promise<model.FileResult>;
 
 export function DecryptFileWithOutput(arg1:string,arg2:string,arg3:string,arg4:string):Promise<model.FileResult>;
@@ -37,6 +41,8 @@ export function ExportKeyToFile(arg1:string):Promise<void>;
 export function FindDecryptionKey(arg1:string):Promise<string>;
 
 export function FindDecryptionKeyFromFile(arg1:string):Promise<string>;
+
+export function FrontendReady():Promise<void>;
 
 export function GenerateKey(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
 
@@ -63,6 +69,8 @@ export function ImportMultipleKeys(arg1:string):Promise<model.MultiImportResult>
 export function ImportPrivateKey(arg1:string,arg2:string):Promise<void>;
 
 export function InstallApp():Promise<void>;
+
+export function InstallContextMenu():Promise<void>;
 
 export function InstallSupported():Promise<boolean>;
 
@@ -101,6 +109,8 @@ export function SetClipboardText(arg1:string):Promise<void>;
 export function SignText(arg1:string,arg2:string,arg3:string):Promise<model.SignResult>;
 
 export function StartKeyserverSearch(arg1:string,arg2:string):Promise<void>;
+
+export function UninstallContextMenu():Promise<void>;
 
 export function VerifyText(arg1:string):Promise<model.VerifyResult>;
 

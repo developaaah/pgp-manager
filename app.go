@@ -33,6 +33,7 @@ import (
 	"github.com/developaaah/pgp-manager/backend/keyserver"
 	"github.com/developaaah/pgp-manager/backend/model"
 	"github.com/developaaah/pgp-manager/backend/notification"
+	"github.com/developaaah/pgp-manager/backend/services"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -64,6 +65,19 @@ type App struct {
 	// availableUpdate is set once by checkForUpdate() when a newer release
 	// exists on GitHub. Empty string means up-to-date or check not done yet.
 	availableUpdate string
+
+	// encBatch collects encrypt-file context requests arriving in quick
+	// succession (Windows Explorer starts one process per selected file)
+	// so they open a single recipient picker.
+	encBatchMu    sync.Mutex
+	encBatch      []string
+	encBatchTimer *time.Timer
+
+	// frontendReady is closed once the frontend has registered its event
+	// listeners (FrontendReady binding) — Wails does not queue events, so
+	// action events emitted earlier would be silently lost.
+	frontendReady chan struct{}
+	readyOnce     sync.Once
 }
 
 // NewApp creates a new App with config, store, and cache initialized.
@@ -90,12 +104,13 @@ func NewApp() *App {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	app := &App{
-		ctx:        ctx,
-		cancel:     cancel,
-		cfg:        cfg,
-		needsSetup: needsSetup,
-		cache:      cache.NewPassphraseCache(ctx, ttl),
-		pgpHandle:  crypto.PGPWithProfile(profile.RFC4880()),
+		ctx:           ctx,
+		cancel:        cancel,
+		cfg:           cfg,
+		needsSetup:    needsSetup,
+		cache:         cache.NewPassphraseCache(ctx, ttl),
+		pgpHandle:     crypto.PGPWithProfile(profile.RFC4880()),
+		frontendReady: make(chan struct{}),
 	}
 
 	if !needsSetup {
@@ -951,6 +966,38 @@ func (a *App) InstallApp() error {
 	return install.Install(appIcon)
 }
 
+// ── File-manager context menu (Windows/Linux) ─────────────────────────────────
+
+// ContextMenuSupported reports whether context-menu entries can be installed
+// on this platform (macOS registers its Services automatically).
+//
+//bind
+func (a *App) ContextMenuSupported() bool {
+	return services.Supported()
+}
+
+// ContextMenuInstalled reports whether the context-menu entries exist.
+//
+//bind
+func (a *App) ContextMenuInstalled() bool {
+	return services.Installed()
+}
+
+// InstallContextMenu adds PGP actions to the file manager's context menu
+// (Windows: Explorer registry entries, Linux: Nautilus/Dolphin/Nemo).
+//
+//bind
+func (a *App) InstallContextMenu() error {
+	return services.Install()
+}
+
+// UninstallContextMenu removes the context-menu entries again.
+//
+//bind
+func (a *App) UninstallContextMenu() error {
+	return services.Uninstall()
+}
+
 // OpenDirectoryDialog opens a native directory picker and returns the chosen path.
 // Returns an empty string if the user cancelled.
 //
@@ -993,25 +1040,62 @@ func (a *App) WindowMaximise() {
 // handleSecondInstance handles a second app launch (Windows/Linux context menu,
 // URL protocol activation). The first instance receives the new instance's args.
 func (a *App) handleSecondInstance(data options.SecondInstanceData) {
-	a.showMainWindow()
-	for _, arg := range data.Args {
-		if strings.HasPrefix(arg, "pgp-manager://") {
-			a.handleActionRequest(arg)
-			return
-		}
+	if a.handleContextArgs(data.Args) {
+		return // the dispatched action decides whether to show the window
 	}
+	a.showMainWindow()
 }
 
 // domReady fires once the frontend has loaded. On a fresh launch via context
-// menu or URL protocol (Windows/Linux), the URL arrives as a CLI argument —
-// handle it now that the frontend can receive events.
+// menu or URL protocol (Windows/Linux), the action arrives as CLI arguments —
+// handle them now that the frontend can receive events.
 func (a *App) domReady(_ context.Context) {
-	for _, arg := range os.Args[1:] {
+	a.handleContextArgs(os.Args[1:])
+}
+
+// FrontendReady is called by the frontend once all event listeners are
+// registered; gated action events are released from this point on.
+//
+//bind
+func (a *App) FrontendReady() {
+	a.readyOnce.Do(func() { close(a.frontendReady) })
+}
+
+// whenFrontendReady runs fn in a goroutine once the frontend can receive
+// events. Never blocks the caller — context actions and URL handlers may run
+// on the main thread during startup, before the webview has loaded.
+func (a *App) whenFrontendReady(fn func()) {
+	go func() {
+		select {
+		case <-a.frontendReady:
+			fn()
+		case <-a.ctx.Done():
+		}
+	}()
+}
+
+// handleContextArgs dispatches a context-menu invocation passed as CLI
+// arguments: either "--context <action> <path>..." (Windows Explorer, Linux
+// file managers) or a pgp-manager:// URL (protocol activation). Paths travel
+// as plain arguments, so special characters need no encoding. Reports
+// whether an action was dispatched.
+func (a *App) handleContextArgs(args []string) bool {
+	for i, arg := range args {
+		if arg == "--context" && i+1 < len(args) {
+			action := args[i+1]
+			paths := args[i+2:]
+			if len(paths) == 0 {
+				return false
+			}
+			go a.runFileAction(action, paths)
+			return true
+		}
 		if strings.HasPrefix(arg, "pgp-manager://") {
 			a.handleActionRequest(arg)
-			return
+			return true
 		}
 	}
+	return false
 }
 
 // decodeBase64Loose decodes base64 that may have travelled through a URL query:
@@ -1134,12 +1218,40 @@ func (a *App) runFileAction(action string, paths []string) {
 		return
 	}
 	if action == "encrypt-file" {
-		a.encryptFilesRequest(paths)
+		// Only Windows Explorer starts one process per selected file — the
+		// macOS bridge and the Linux %F entries deliver the whole selection
+		// in a single call, so they skip the batching delay.
+		if goruntime.GOOS == "windows" {
+			a.queueEncryptFiles(paths)
+		} else {
+			a.encryptFilesRequest(paths)
+		}
 		return
 	}
 	for _, path := range paths {
 		a.runSingleFileAction(action, path)
 	}
+}
+
+// queueEncryptFiles batches encrypt-file requests briefly before opening the
+// recipient picker: Windows Explorer launches one process per selected file,
+// and the batch turns those into a single request.
+func (a *App) queueEncryptFiles(paths []string) {
+	a.encBatchMu.Lock()
+	defer a.encBatchMu.Unlock()
+	a.encBatch = append(a.encBatch, paths...)
+	if a.encBatchTimer != nil {
+		a.encBatchTimer.Stop()
+	}
+	a.encBatchTimer = time.AfterFunc(400*time.Millisecond, func() {
+		a.encBatchMu.Lock()
+		batch := a.encBatch
+		a.encBatch = nil
+		a.encBatchMu.Unlock()
+		if len(batch) > 0 {
+			a.encryptFilesRequest(batch)
+		}
+	})
 }
 
 // runSingleFileAction executes a headless file action on one file.
@@ -1255,8 +1367,10 @@ func (a *App) setClipboardSilent(text string) {
 }
 
 func (a *App) emitActionResult(res model.ActionResult) {
-	a.showMainWindow()
-	runtime.EventsEmit(a.ctx, "action:result", res)
+	a.whenFrontendReady(func() {
+		a.showMainWindow()
+		runtime.EventsEmit(a.ctx, "action:result", res)
+	})
 }
 
 // defaultKeyFingerprint returns the user's primary key (the first private key
@@ -1295,9 +1409,11 @@ func (a *App) importKeyAction(text string) {
 	if len(fps) > 0 {
 		fp = fps[0]
 	}
-	runtime.EventsEmit(a.ctx, "notification:imported", fp)
-	runtime.EventsEmit(a.ctx, "refresh-keys")
-	a.showMainWindow()
+	a.whenFrontendReady(func() {
+		runtime.EventsEmit(a.ctx, "notification:imported", fp)
+		runtime.EventsEmit(a.ctx, "refresh-keys")
+		a.showMainWindow()
+	})
 }
 
 // decryptToWindow decrypts armored text (clipboard when empty) and presents
@@ -1328,15 +1444,23 @@ func (a *App) decryptTextAction(text string, window bool) {
 // recipient picker there — encryption happens in the UI once the user has
 // chosen recipients (context action and tray behave identically).
 func (a *App) encryptTextRequest(text string) {
-	a.showMainWindow()
-	runtime.EventsEmit(a.ctx, "encrypt-text-requested", text)
+	if strings.TrimSpace(text) == "" {
+		a.emitActionResult(model.ActionResult{Action: "encrypt-text", Error: "No text to encrypt — the clipboard or selection is empty"})
+		return
+	}
+	a.whenFrontendReady(func() {
+		a.showMainWindow()
+		runtime.EventsEmit(a.ctx, "encrypt-text-requested", text)
+	})
 }
 
 // encryptFilesRequest loads files into the encrypt view and opens the
 // recipient picker there (the Finder service behaves like the text service).
 func (a *App) encryptFilesRequest(paths []string) {
-	a.showMainWindow()
-	runtime.EventsEmit(a.ctx, "encrypt-file-requested", paths)
+	a.whenFrontendReady(func() {
+		a.showMainWindow()
+		runtime.EventsEmit(a.ctx, "encrypt-file-requested", paths)
+	})
 }
 
 // signTextToWindow signs text and presents the result in the UI (tray action).
@@ -1487,8 +1611,10 @@ func (a *App) dispatchClipboard(trimmed string) {
 		if bcrypto.FindDecryptionKey(a.store, trimmed) == "" {
 			return
 		}
-		a.showMainWindow()
-		runtime.EventsEmit(a.ctx, "clipboard-message-detected", trimmed)
+		a.whenFrontendReady(func() {
+			a.showMainWindow()
+			runtime.EventsEmit(a.ctx, "clipboard-message-detected", trimmed)
+		})
 	}
 }
 
@@ -1513,8 +1639,10 @@ func (a *App) clipboardKeyDetected(armored, mode string) {
 	default: // ClipKeysOff
 		return
 	}
-	a.showMainWindow()
-	runtime.EventsEmit(a.ctx, "clipboard-key-detected", armored)
+	a.whenFrontendReady(func() {
+		a.showMainWindow()
+		runtime.EventsEmit(a.ctx, "clipboard-key-detected", armored)
+	})
 }
 
 // showMainWindow ensures the Wails window is visible and focused on the

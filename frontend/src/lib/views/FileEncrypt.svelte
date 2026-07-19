@@ -20,11 +20,28 @@
 
   $: filePath = filePaths.length === 1 ? filePaths[0] : ''
   $: fileName = filePaths.length === 1 ? baseName(filePaths[0]) : `${filePaths.length} files`
-  $: isPGPFile = filePaths.length === 1 && /\.(pgp|asc|gpg)$/i.test(filePaths[0])
+  $: isPGPFile = filePaths.length > 0 && filePaths.every(p => /\.(pgp|asc|gpg)$/i.test(p))
 
   $: if ($pendingEncryptFiles !== null) {
     const paths = $pendingEncryptFiles
     pendingEncryptFiles.set(null)
+    requestEncrypt(paths)
+  }
+
+  // A new encrypt request can arrive while the recipient picker is open or a
+  // batch is running (Windows Explorer starts one process per selected
+  // file). Merge or queue it — files must never be silently dropped.
+  let queuedEncrypt = []
+
+  function requestEncrypt(paths) {
+    if (state === 'working') {
+      queuedEncrypt = [...queuedEncrypt, ...paths]
+      return
+    }
+    if (state === 'ready' && showRecipientModal) {
+      filePaths = [...new Set([...filePaths, ...paths])]
+      return
+    }
     setFiles(paths)
     handleEncrypt()
   }
@@ -77,37 +94,62 @@
     outputPaths = outputs
     if (failures.length) { error = failures.join('\n'); state = 'ready' }
     else state = 'done'
+    drainQueuedEncrypt()
+  }
+
+  function drainQueuedEncrypt() {
+    if (!queuedEncrypt.length) return
+    const queued = [...new Set(queuedEncrypt)]
+    queuedEncrypt = []
+    setFiles(queued)
+    handleEncrypt()
   }
 
   async function handleDecrypt() {
+    state = 'working'; error = ''
+    const outputs = []
+    const failures = []
     try {
-      const matchFp = await FindDecryptionKeyFromFile(filePath)
-      if (!matchFp) { error = 'No matching private key found for this file.'; return }
-
       const keys = await ListKeys()
-      const key = keys.find(k => k.Fingerprint === matchFp)
-      if (!key) { error = 'No matching private key found for this file.'; return }
+      for (const path of filePaths) {
+        const matchFp = await FindDecryptionKeyFromFile(path)
+        const key = matchFp ? keys.find(k => k.Fingerprint === matchFp) : null
+        if (!key) {
+          failures.push(`${baseName(path)}: no matching private key found`)
+          continue
+        }
 
-      let pp
-      if (await HasCachedPassphrase(matchFp)) {
-        pp = await GetCachedPassphrase(matchFp)
-      } else {
-        pp = await askPassphrase(key.Email || key.PrimaryUID)
-        if (pp === null) return
+        let pp
+        if (await HasCachedPassphrase(matchFp)) {
+          pp = await GetCachedPassphrase(matchFp)
+        } else {
+          pp = await askPassphrase(key.Email || key.PrimaryUID)
+          if (pp === null) break // cancelled — keep what already finished
+        }
+
+        const result = await DecryptFile(path, matchFp, pp)
+        if (result.Error) {
+          failures.push(`${baseName(path)}: ${result.Error}`)
+          continue
+        }
+        await CachePassphrase(matchFp, pp)
+        outputs.push(result.OutputPath)
       }
-
-      state = 'working'; error = ''
-      const result = await DecryptFile(filePath, matchFp, pp)
-      if (result.Error) { error = result.Error; state = 'ready'; return }
-      await CachePassphrase(matchFp, pp)
-      outputPaths = [result.OutputPath]
-      state = 'done'
-    } catch (e) { error = String(e); state = 'ready' }
+      outputPaths = outputs
+      if (failures.length) { error = failures.join('\n'); state = 'ready' }
+      else if (outputs.length) state = 'done'
+      else state = 'ready'
+    } catch (e) {
+      outputPaths = outputs
+      error = String(e)
+      state = 'ready'
+    }
   }
 
   function reset() {
     state = 'idle'; filePaths = []
     error = ''; outputPaths = []; selectedFingerprints = []
+    queuedEncrypt = []
   }
 
   async function copyOutputPath() {
@@ -236,6 +278,19 @@
 
       {#if error}
         <p class="text-[13px] text-red-500 px-1 whitespace-pre-wrap">{error}</p>
+      {/if}
+
+      {#if outputPaths.length}
+        <div class="rounded-field bg-pgp-field border border-pgp-field-border px-4 py-3">
+          <p class="text-[12px] text-pgp-text-3 mb-1">
+            {outputPaths.length} {outputPaths.length === 1 ? 'file was' : 'files were'} written:
+          </p>
+          <div class="max-h-[120px] overflow-auto">
+            {#each outputPaths as path}
+              <p class="text-[12px] font-mono text-pgp-text-2 select-all break-all">{path}</p>
+            {/each}
+          </div>
+        </div>
       {/if}
 
       <div class="flex items-center gap-[6px]">

@@ -9,7 +9,7 @@
   import ImportKeyModal from './modals/ImportKeyModal.svelte'
   import ActionResultModal from './modals/ActionResultModal.svelte'
   import SetupModal from './modals/SetupModal.svelte'
-  import { GetPlatform, GetConfig, NeedsSetup, GetAvailableUpdate } from '../wailsjs/go/main/App'
+  import { GetPlatform, GetConfig, NeedsSetup, GetAvailableUpdate, FrontendReady } from '../wailsjs/go/main/App'
   import { EventsOn, EventsOff } from '../wailsjs/runtime/runtime'
   import { themeOverride, pendingImportArmored, pendingClipboardMessage, pendingEncryptText, pendingEncryptFiles, availableUpdate } from './stores.js'
 
@@ -89,8 +89,14 @@
 
     EventsOn('encrypt-file-requested', (paths) => {
       activeView = 'files'
-      pendingEncryptFiles.set(Array.isArray(paths) ? paths : [paths])
+      const arr = Array.isArray(paths) ? paths : [paths]
+      // Merge with a not-yet-consumed request instead of replacing it — a
+      // second event must never silently drop the first one's files.
+      pendingEncryptFiles.update(prev => (prev ? [...prev, ...arr] : arr))
     })
+
+    // Backend action events are gated until the listeners above exist.
+    FrontendReady().catch(() => {})
 
     return () => {
       window.removeEventListener('focus', onFocus)

@@ -3,7 +3,6 @@ package crypto
 import (
 	"bytes"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -40,32 +39,11 @@ func EncryptFile(ks *keystore.Store, inputPath string, recipientFingerprints []s
 		signedData = inputData
 	}
 
-	// 2. Recipient-Keys auflösen — always use the public part, never a
-	// locked private key (gopenpgp rejects locked keys in an encryption keyring).
+	// 2. Recipient-Keys auflösen
 	pgpHandle := crypto.PGPWithProfile(profile.RFC4880())
-	recipients := make([]*crypto.Key, 0, len(recipientFingerprints))
-	for _, fp := range recipientFingerprints {
-		armored, err := ks.GetArmored(fp)
-		if err != nil {
-			slog.Warn("recipient key not found", "fingerprint", fp, "error", err)
-			continue
-		}
-		key, err := crypto.NewKeyFromArmored(armored)
-		if err != nil {
-			slog.Warn("invalid recipient key", "fingerprint", fp, "error", err)
-			continue
-		}
-		if key.IsPrivate() {
-			key, err = key.ToPublic()
-			if err != nil {
-				slog.Warn("failed to extract public key", "fingerprint", fp, "error", err)
-				continue
-			}
-		}
-		recipients = append(recipients, key)
-	}
-	if len(recipients) == 0 {
-		return model.FileResult{Error: "no valid recipients"}
+	recipients, err := resolveRecipients(ks, recipientFingerprints)
+	if err != nil {
+		return model.FileResult{Error: err.Error()}
 	}
 
 	// 3. Encrypt (sign-then-encrypt)

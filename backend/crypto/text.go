@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"strings"
 
@@ -23,31 +22,9 @@ import (
 func EncryptText(ks *keystore.Store, plaintext string, recipientFingerprints []string, signingFingerprint, signingPassphrase string) model.EncryptResult {
 	pgpHandle := crypto.PGPWithProfile(profile.RFC4880())
 
-	// Resolve recipients — always use the public part, never a locked private key.
-	recipients := make([]*crypto.Key, 0, len(recipientFingerprints))
-	for _, fp := range recipientFingerprints {
-		armored, err := ks.GetArmored(fp)
-		if err != nil {
-			slog.Warn("recipient key not found", "fingerprint", fp, "error", err)
-			continue
-		}
-		key, err := crypto.NewKeyFromArmored(armored)
-		if err != nil {
-			slog.Warn("invalid recipient key", "fingerprint", fp, "error", err)
-			continue
-		}
-		if key.IsPrivate() {
-			key, err = key.ToPublic()
-			if err != nil {
-				slog.Warn("failed to extract public key", "fingerprint", fp, "error", err)
-				continue
-			}
-		}
-		recipients = append(recipients, key)
-	}
-
-	if len(recipients) == 0 {
-		return model.EncryptResult{Error: "no valid recipients"}
+	recipients, err := resolveRecipients(ks, recipientFingerprints)
+	if err != nil {
+		return model.EncryptResult{Error: err.Error()}
 	}
 
 	// Build encryption handle — chain Recipient() for each key.
