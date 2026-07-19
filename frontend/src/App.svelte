@@ -9,9 +9,9 @@
   import ImportKeyModal from './modals/ImportKeyModal.svelte'
   import ActionResultModal from './modals/ActionResultModal.svelte'
   import SetupModal from './modals/SetupModal.svelte'
-  import { GetPlatform, GetConfig, NeedsSetup, GetAvailableUpdate } from '../wailsjs/go/main/App'
+  import { GetPlatform, GetConfig, NeedsSetup, GetAvailableUpdate, FrontendReady } from '../wailsjs/go/main/App'
   import { EventsOn, EventsOff } from '../wailsjs/runtime/runtime'
-  import { themeOverride, pendingImportArmored, pendingClipboardMessage, availableUpdate } from './stores.js'
+  import { themeOverride, pendingImportArmored, pendingClipboardMessage, pendingEncryptText, pendingEncryptFiles, availableUpdate } from './stores.js'
 
   let activeView = 'text'
   let platform = 'darwin'
@@ -82,6 +82,22 @@
       pendingClipboardMessage.set(armored)
     })
 
+    EventsOn('encrypt-text-requested', (text) => {
+      activeView = 'text'
+      pendingEncryptText.set(text)
+    })
+
+    EventsOn('encrypt-file-requested', (paths) => {
+      activeView = 'files'
+      const arr = Array.isArray(paths) ? paths : [paths]
+      // Merge with a not-yet-consumed request instead of replacing it — a
+      // second event must never silently drop the first one's files.
+      pendingEncryptFiles.update(prev => (prev ? [...prev, ...arr] : arr))
+    })
+
+    // Backend action events are gated until the listeners above exist.
+    FrontendReady().catch(() => {})
+
     return () => {
       window.removeEventListener('focus', onFocus)
       window.removeEventListener('blur', onBlur)
@@ -89,6 +105,8 @@
       EventsOff('action:result')
       EventsOff('clipboard-key-detected')
       EventsOff('clipboard-message-detected')
+      EventsOff('encrypt-text-requested')
+      EventsOff('encrypt-file-requested')
       EventsOff('update:available')
     }
   })

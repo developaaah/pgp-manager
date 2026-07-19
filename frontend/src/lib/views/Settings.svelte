@@ -4,7 +4,8 @@
     GetConfig, SaveConfig, OpenDirectoryDialog,
     ListKeyservers, AddCustomKeyserver, RemoveCustomKeyserver,
     GetPlatform, AutostartSupported, GetAutostart, SetAutostart,
-    AppVersion, OpenExternal, InstallSupported, IsInstalled, InstallApp
+    AppVersion, OpenExternal, InstallSupported, IsInstalled, InstallApp,
+    ContextMenuSupported, ContextMenuInstalled, InstallContextMenu, UninstallContextMenu
   } from '../../../wailsjs/go/main/App'
   import { themeOverride } from '../../stores.js'
   import Toggle from '../Toggle.svelte'
@@ -34,6 +35,12 @@
   let installing = false
   let installMsg = ''
   let installError = ''
+
+  let ctxSupported = false
+  let ctxInstalled = false
+  let ctxBusy = false
+  let ctxMsg = ''
+  let ctxError = ''
 
   const keyModeOptions = [
     { value: 'off',     label: 'Off' },
@@ -85,6 +92,10 @@
     try {
       [version, installSupported, installed] =
         await Promise.all([AppVersion(), InstallSupported(), IsInstalled()])
+    } catch {}
+    try {
+      [ctxSupported, ctxInstalled] =
+        await Promise.all([ContextMenuSupported(), ContextMenuInstalled()])
     } catch {}
     await loadKeyservers()
   })
@@ -172,6 +183,28 @@
     } catch (err) {
       autostartError = String(err)
       autostartOn = !enable
+    }
+  }
+
+  async function handleContextMenuToggle() {
+    ctxBusy = true
+    ctxError = ''
+    ctxMsg = ''
+    try {
+      if (ctxInstalled) {
+        await UninstallContextMenu()
+        ctxMsg = 'Context-menu entries removed.'
+      } else {
+        await InstallContextMenu()
+        ctxMsg = platform === 'windows'
+          ? 'Installed — entries appear in the Explorer right-click menu (Windows 11: under "Show more options").'
+          : 'Installed — entries appear in the file manager\'s right-click menu (Nautilus may need a restart).'
+      }
+      ctxInstalled = await ContextMenuInstalled()
+    } catch (e) {
+      ctxError = String(e)
+    } finally {
+      ctxBusy = false
     }
   }
 
@@ -477,7 +510,7 @@
     </div>
   </section>
 
-  {#if installSupported || platform === 'darwin'}
+  {#if installSupported || ctxSupported || platform === 'darwin'}
     <section>
       <p class="text-[11px] font-bold uppercase tracking-[0.07em] text-pgp-text-4 mb-2 px-1">
         System
@@ -510,6 +543,35 @@
           {/if}
           {#if installError}
             <p class="py-2 text-[12px] text-red-500">{installError}</p>
+          {/if}
+        {/if}
+
+        {#if ctxSupported}
+          <div class="flex items-center justify-between gap-4 py-3">
+            <div class="min-w-0">
+              <p class="text-[13px] text-pgp-text-2">File Manager Context Menu</p>
+              <p class="text-[12px] text-pgp-text-4 leading-[1.45] mt-[1px]">
+                {#if platform === 'windows'}
+                  Add "PGP Manager" actions to the Explorer right-click menu
+                {:else}
+                  Add PGP actions to Nautilus, Dolphin, and Nemo right-click menus
+                {/if}
+              </p>
+            </div>
+            <button
+              type="button"
+              on:click={handleContextMenuToggle}
+              disabled={ctxBusy}
+              class="flex-shrink-0 h-8 px-4 rounded-btn text-[12px] font-medium
+                     bg-pgp-fill-2 border border-pgp-border-strong text-pgp-text-2
+                     hover:bg-pgp-fill disabled:opacity-50 transition-colors duration-75"
+            >{ctxBusy ? 'Working…' : ctxInstalled ? 'Remove' : 'Install'}</button>
+          </div>
+          {#if ctxMsg}
+            <p class="py-2 text-[12px] text-pgp-text-3">{ctxMsg}</p>
+          {/if}
+          {#if ctxError}
+            <p class="py-2 text-[12px] text-red-500">{ctxError}</p>
           {/if}
         {/if}
 

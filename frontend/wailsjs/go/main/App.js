@@ -26,6 +26,14 @@ export function ConfirmSetup(arg1) {
   return window['go']['main']['App']['ConfirmSetup'](arg1);
 }
 
+export function ContextMenuInstalled() {
+  return window['go']['main']['App']['ContextMenuInstalled']();
+}
+
+export function ContextMenuSupported() {
+  return window['go']['main']['App']['ContextMenuSupported']();
+}
+
 export function DecryptFile(arg1, arg2, arg3) {
   return window['go']['main']['App']['DecryptFile'](arg1, arg2, arg3);
 }
@@ -72,6 +80,10 @@ export function FindDecryptionKey(arg1) {
 
 export function FindDecryptionKeyFromFile(arg1) {
   return window['go']['main']['App']['FindDecryptionKeyFromFile'](arg1);
+}
+
+export function FrontendReady() {
+  return window['go']['main']['App']['FrontendReady']();
 }
 
 export function GenerateKey(arg1, arg2, arg3, arg4, arg5) {
@@ -124,6 +136,10 @@ export function ImportPrivateKey(arg1, arg2) {
 
 export function InstallApp() {
   return window['go']['main']['App']['InstallApp']();
+}
+
+export function InstallContextMenu() {
+  return window['go']['main']['App']['InstallContextMenu']();
 }
 
 export function InstallSupported() {
@@ -200,6 +216,10 @@ export function SignText(arg1, arg2, arg3) {
 
 export function StartKeyserverSearch(arg1, arg2) {
   return window['go']['main']['App']['StartKeyserverSearch'](arg1, arg2);
+}
+
+export function UninstallContextMenu() {
+  return window['go']['main']['App']['UninstallContextMenu']();
 }
 
 export function VerifyText(arg1) {

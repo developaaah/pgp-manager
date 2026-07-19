@@ -2,8 +2,9 @@
 //
 // Services: text selections are passed straight into Go via
 // pgpGoServiceFired(); Finder file selections via pgpGoFileServiceFired()
-// (once per file). Tray menu clicks go through pgpGoTrayAction().
-// All Go entry points are declared in _cgo_export.h.
+// (one call per invocation, paths newline-joined). Tray menu clicks go
+// through pgpGoTrayAction(). All Go entry points are declared in
+// _cgo_export.h.
 
 #import <Cocoa/Cocoa.h>
 #import <Foundation/Foundation.h>
@@ -23,10 +24,17 @@ static void fireTextService(NSString* action, NSPasteboard* pb) {
 static void fireFileService(NSString* action, NSPasteboard* pb) {
     NSArray<NSURL*>* urls = [pb readObjectsForClasses:@[[NSURL class]]
                                               options:@{NSPasteboardURLReadingFileURLsOnlyKey: @YES}];
+    NSMutableArray<NSString*>* paths = [NSMutableArray array];
     for (NSURL* url in urls) {
         if (!url.path || url.path.length == 0) continue;
-        pgpGoFileServiceFired((char*)[action UTF8String], (char*)[url.path UTF8String]);
+        [paths addObject:url.path];
     }
+    if (paths.count == 0) return;
+    // One callback for the whole Finder selection so multi-file actions can
+    // be handled as a unit; paths are newline-joined (newlines in file names
+    // are not supported).
+    NSString* joined = [paths componentsJoinedByString:@"\n"];
+    pgpGoFileServiceFired((char*)[action UTF8String], (char*)[joined UTF8String]);
 }
 
 @implementation PGPServiceDelegate
