@@ -22,6 +22,8 @@ PGP Manager is **not a new encryption system**. It is a simpler way to work with
 
 Available for **macOS**, **Windows**, and **Linux**.
 
+<a href="https://www.producthunt.com/products/pgp-manager?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-pgp-manager" target="_blank" rel="noopener noreferrer"><img alt="PGP Manager - Open-source PGP encryption for Mac, Windows &amp; Linux | Product Hunt" height="35" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1204793&amp;theme=neutral&amp;t=1785147068631"></a>
+
 <br><br>
 
 ## Installation
@@ -381,6 +383,8 @@ Pre-release builds (`v*-beta.*`, `v*-rc.*`) are published as pre-releases and wi
 ## Support the Project
 
 If PGP Manager saves you time or helps keep your communications secure, consider supporting its development.
+
+<a href="https://www.producthunt.com/products/pgp-manager/reviews/new?utm_source=badge-product_review&utm_medium=badge&utm_source=badge-pgp&#0045;manager" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/product_review.svg?product_id=1277081&theme=light" alt="PGP&#0032;Manager - Open&#0045;source&#0032;PGP&#0032;encryption&#0032;for&#0032;Mac&#0044;&#0032;Windows&#0032;&#0038;&#0032;Linux | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
 
 [![PayPal](https://img.shields.io/badge/PayPal-Buy_me_a_coffee-blue?logo=paypal&style=for-the-badge)](https://paypal.me/dennischuster)
 
