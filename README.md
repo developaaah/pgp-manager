@@ -22,6 +22,8 @@ PGP Manager is **not a new encryption system**. It is a simpler way to work with
 
 Available for **macOS**, **Windows**, and **Linux**.
 
+![PGP Manager Demo Video](demo.gif)
+
 <a href="https://www.producthunt.com/products/pgp-manager?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-pgp-manager" target="_blank" rel="noopener noreferrer"><img alt="PGP Manager - Open-source PGP encryption for Mac, Windows &amp; Linux | Product Hunt" height="35" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1204793&amp;theme=neutral&amp;t=1785147068631"></a>
 
 <br><br>
